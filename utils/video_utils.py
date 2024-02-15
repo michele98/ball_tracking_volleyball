@@ -3,6 +3,7 @@ import os
 import cv2
 
 import numpy as np
+from typing import Union
 
 
 def figure_to_array(fig):
@@ -16,7 +17,7 @@ def figure_to_array(fig):
     return im[:,:,:3]
 
 
-def frame_generator_dir(dir_name, start_frame=None, stop_frame=None, verbose=True):
+def frame_generator_dir(dir_name, start_frame=0, stop_frame=None, verbose=True):
     """Generator that yields frames from a directory containing images.
 
     Parameters
@@ -35,7 +36,7 @@ def frame_generator_dir(dir_name, start_frame=None, stop_frame=None, verbose=Tru
     array
         the current video frame. The channel order is RGB.
 
-    # Raises
+    Raises
     ------
     FileNotFoundError
         if the video file does not exist
@@ -46,9 +47,6 @@ def frame_generator_dir(dir_name, start_frame=None, stop_frame=None, verbose=Tru
         raise FileNotFoundError(f'Folder {dir_name} not found!')
 
     frame_names = sorted(os.listdir(dir_name))
-
-    if start_frame is None:
-        start_frame = 0
 
     if stop_frame is None:
         stop_frame = len(frame_names) - start_frame
@@ -64,7 +62,7 @@ def frame_generator_dir(dir_name, start_frame=None, stop_frame=None, verbose=Tru
     if verbose: print("Finished frames.")
 
 
-def frame_generator(filename, start_frame=None, stop_frame=None, verbose=True):
+def frame_generator_file(filename, start_frame=0, stop_frame=None, verbose=True):
     """Generator that yields frames from a video file.
 
     Parameters
@@ -83,7 +81,7 @@ def frame_generator(filename, start_frame=None, stop_frame=None, verbose=True):
     array
         the current video frame. The channel order is RGB.
 
-    # Raises
+    Raises
     ------
     FileNotFoundError
         if the video file does not exist
@@ -93,9 +91,6 @@ def frame_generator(filename, start_frame=None, stop_frame=None, verbose=True):
     cap = cv2.VideoCapture(filename)
     if not cap.isOpened():
         raise FileNotFoundError(f'Video file {filename} not found!')
-
-    if start_frame is None:
-        start_frame = 0
 
     if stop_frame is None:
         stop_frame = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -118,3 +113,63 @@ def frame_generator(filename, start_frame=None, stop_frame=None, verbose=True):
     if verbose: print(f"writing frame {i-start_frame+1} of {stop_frame-start_frame}".ljust(80))
     if verbose: print("Finished frames.")
     cap.release()
+
+
+def frame_generator(src: Union[str, list],
+                    start_frames: Union[int, list] = None,
+                    stop_frames: Union[int, list] = None,
+                    verbose: bool = True):
+    """Generator that yields video frames from the given sources.
+
+    Parameters
+    ----------
+    src : string | list of str
+        names of the video sources (one or multiple). Each source can either be a video file
+        or a folder containing the single video frames as image files.
+    start_frames : int | list of int, optional
+        starting frame from which to read each video source, by default 0.
+    stop_frames : int | list of int, optional
+        final frame from which to read each video source, by default the final frame
+    verbose : bool, optional
+        by default True
+
+    Yields
+    ------
+    array
+        the current video frame. The channel order is RGB.
+
+    Raises
+    ------
+    FileNotFoundError
+        if a video source does not exist
+    ValueError
+         - if `sources`, `start_frames` and `stop_frames` have different lengths
+         - if `start_frames[i]` >= `stop_frames[i]` for any `i`
+    """
+    if type(src) is str:
+        src = [src]
+
+    if start_frames is None:
+        start_frames = [0 for _ in range(len(src))]
+
+    if stop_frames is None:
+        stop_frames = [None for _ in range(len(src))]
+
+    if type(start_frames) is int:
+        start_frames = [start_frames]
+
+    if type(stop_frames) is int:
+        stop_frames = [stop_frames]
+
+    if len(start_frames) != len(src) or len(stop_frames) != len(src):
+        raise ValueError('src, start_frames and stop_frames must have the same length.')
+
+    for source in src:
+        if not os.path.exists(source):
+            raise ValueError(f'Source {src} not found')
+
+    for i in range(len(src)):
+        generator = frame_generator_dir if os.path.isdir(src[i]) else frame_generator_file
+        if verbose: print(f'source {i+1} of {len(src)}:')
+        for frame in generator(src[i], start_frames[i], stop_frames[i], verbose):
+            yield frame

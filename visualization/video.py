@@ -1,11 +1,13 @@
 import gc
-
+import os
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+
+from typing import Union
 from matplotlib.font_manager import FontProperties
 
-from utils.video_utils import *
+from utils.video_utils import frame_generator, figure_to_array
 
 # from trajectories.data_reading import get_candidates, get_heatmap, get_video_source
 from trajectories.fitting import fit_trajectories
@@ -132,7 +134,6 @@ def show_single_trajectory(fitting_info,
     else:
         k_seed = starting_frame
 
-
     # find k_min, k_mid and and k_max
     if exists_trajectory:
         if k_min is None:
@@ -145,7 +146,7 @@ def show_single_trajectory(fitting_info,
 
         if k_max is None:
             k_max = trajectory_info['k_max']
-            i_max = trajectory_info['i_mid']
+            i_max = trajectory_info['i_max']
         elif i_max is None:
             raise ValueError('You must pass both k_max and i_max')
 
@@ -410,7 +411,7 @@ def show_neighboring_trajectories(frame_idx,
 
 
 def create_trajectory_video(candidates,
-                            src: str,
+                            src: Union[str, list],
                             dst: str,
                             fitting_info=None,
                             path_mapping=None,
@@ -438,13 +439,15 @@ def create_trajectory_video(candidates,
     print("Rendering video")
 
     # set dst resolution and fps
-    if os.path.isfile(src):
-        cap = cv2.VideoCapture(src)
+    if type(src) is str:
+        src = [src]
+    if os.path.isfile(src[0]):
+        cap = cv2.VideoCapture(src[0])
         fps = cap.get(cv2.CAP_PROP_FPS)
         _, first_frame = cap.read()
         cap.release()
-    elif os.path.isdir(src):
-        first_frame = next(iter(frame_generator_dir(src)))
+    elif os.path.isdir(src[0]):
+        first_frame = next(iter(frame_generator(src[0], verbose=False)))
     else:
         raise FileNotFoundError(f'The specified source {src} does not exist')
 
@@ -468,9 +471,11 @@ def create_trajectory_video(candidates,
 
     fig, ax = plt.subplots(figsize=(w/dpi, h/dpi), dpi=dpi)
 
-    gen = frame_generator_dir if os.path.isdir(src) else frame_generator
-
-    for i, frame in enumerate(gen(src, starting_frame, starting_frame+num_frames)):
+    # TODO: implement ending frame
+    # for i, frame in enumerate(frame_generator(src, starting_frame, starting_frame+num_frames)):
+    if type(starting_frame) is int:
+        starting_frames = [starting_frame]*len(src)
+    for i, frame in enumerate(frame_generator(src, starting_frames)):
         frame = cv2.resize(frame.copy(), (w, h))
         ax.cla()
         if i%100 == 0:

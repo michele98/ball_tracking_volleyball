@@ -151,7 +151,7 @@ def build_path_mapping(fitting_info: dict, shortest_paths: list = None):
     last_frames = [trajectories_info[frame_sequence.index(node)]['k_max'] for node in path]
 
     mapping = {}
-    for frame_idx in range(trajectories_info[0]['k_seed'], trajectories_info[-1]['k_seed']):
+    for frame_idx in range(trajectories_info[0]['k_seed'], trajectories_info[-1]['k_seed']+1):
         mapping[frame_idx] = None
         for k_min, k_seed, k_max in zip(first_frames, path, last_frames):
             if k_min <= frame_idx and k_max >= frame_idx:
