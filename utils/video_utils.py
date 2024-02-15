@@ -45,7 +45,7 @@ def frame_generator_dir(dir_name, start_frame=None, stop_frame=None, verbose=Tru
     if not os.path.exists(dir_name):
         raise FileNotFoundError(f'Folder {dir_name} not found!')
 
-    frame_names = os.listdir(dir_name)
+    frame_names = sorted(os.listdir(dir_name))
 
     if start_frame is None:
         start_frame = 0
