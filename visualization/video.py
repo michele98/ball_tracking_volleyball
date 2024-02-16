@@ -437,12 +437,27 @@ def show_neighboring_trajectories(frame_idx,
     return im2
 
 
-def get_heatmap(trigger_frames: Union[set, list], current_frame: int, w: int, h: int):
+def get_heatmap(trigger_frames: Union[set, list],
+                current_frame: int,
+                w: int, h: int,
+                fade: int = 5,
+                fade_before: bool = True,
+                color: tuple = (0, 255, 0)):
     im = np.zeros((h,w,3), dtype=np.uint8)
     if trigger_frames is None:
         return im
-    if current_frame in trigger_frames:
-        im[:,:,1] += 255
+    for i in range(fade):
+        if current_frame-i in trigger_frames:
+            for c in range(3):
+                im[:,:,c] += int(color[c]/fade*(fade-i))
+            return im
+    if fade_before:
+        fade = fade//2
+        for i in range(fade):
+            if current_frame+i in trigger_frames:
+                for c in range(3):
+                    im[:,:,c] += int(color[c]/fade*(fade-i))
+                return im
     return im
 
 
