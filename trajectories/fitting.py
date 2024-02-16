@@ -424,7 +424,7 @@ def fit_trajectory(candidates: np.ndarray, n_candidates: np.ndarray, k_seed: int
 
     info_dict['v'] = parameters[s,0]
     info_dict['a'] = parameters[s,1]
-    info_dict['p0'] = candidates[info_dict['k_min']]
+    info_dict['p0'] = candidates[info_dict['k_min'], info_dict['i_min']]
     info_dict['trajectory'] = trajectories[s]
     info_dict['support'] = supports[s, :info[s,8]]
     info_dict['cost'] = costs[s]

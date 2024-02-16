@@ -16,7 +16,7 @@ from trajectories.filtering import (build_path_mapping, build_trajectory_graph,
                                     find_shortest_paths)
 
 
-def annotate_frame(frame, predicted_positions, true_position=None, max_heatmap_value=None):
+def annotate_detections(frame, predicted_positions, true_position=None, max_heatmap_value=None):
     """Put dots on the predicted (red) and true (green) ball positions.
 
     Parameters
@@ -80,6 +80,103 @@ def annotate_frame(frame, predicted_positions, true_position=None, max_heatmap_v
     return annotated_frame
 
 
+def get_stats_table(frame_index: int,
+                    trajectory_info: dict,
+                    s: int = 7):
+
+    ann = f"{frame_index}".ljust(s+2) if frame_index is not None else " "*(s+2)
+    ann += f"x" + " "*(s-1) + "y" + " "*(s-3) + "|.|"
+    ann += "\n" + "\u2014"*(s*3+3) + "\n"
+
+    if trajectory_info['found_trajectory']:
+        p0 = trajectory_info['p0']
+        v0 = trajectory_info['v']
+        a = trajectory_info['a']
+
+        if frame_index is not None:
+            t = frame_index - trajectory_info['k_min']
+            v = v0 + a*t
+            p = p0 + v0*t + a*t*t/2
+            ann += "p  " + f"{p[1]:.0f}".rjust(s) + f"{p[0]:.0f}".rjust(s)
+            ann += "\n"
+            ann += "v  " + f"{v[1]:.2f}".rjust(s) + f"{v[0]:.2f}".rjust(s) + f"{np.linalg.norm(v):.2f}".rjust(s)
+            ann += "\n"
+        ann += "p0 " + f"{p0[1]:.0f}".rjust(s) + f"{p0[0]:.0f}".rjust(s)
+        ann += "\n"
+        ann += "v0 " + f"{v0[1]:.2f}".rjust(s) + f"{v0[0]:.2f}".rjust(s) + f"{np.linalg.norm(v0):.2f}".rjust(s)
+        ann += "\n"
+        ann += "a  " + f"{a[1]:.2f}".rjust(s) + f"{a[0]:.2f}".rjust(s) + f"{np.linalg.norm(a):.2f}".rjust(s)
+    else:
+        if frame_index is not None:
+            ann += "p  " + f"---".rjust(s) + f"---".rjust(s)
+            ann += "\n"
+            ann += "v  " + f"---".rjust(s) + f"---".rjust(s) + f"---".rjust(s)
+            ann += "\n"
+        ann += "p0 " + f"---".rjust(s) + f"---".rjust(s)
+        ann += "\n"
+        ann += "v0 " + f"---".rjust(s) + f"---".rjust(s) + f"---".rjust(s)
+        ann += "\n"
+        ann += "a  " + f"---".rjust(s) + f"---".rjust(s) + f"---".rjust(s)
+    return ann
+
+
+def display_frame_labels(ax,
+                         display: str,
+                         candidates: np.ndarray,
+                         trajectory_info: dict,
+                         starting_frame: int,
+                         annotate: bool,
+                         show_fitting_points: bool,
+                         trajectory_color: str,
+                         fontsize: int):
+    k_seed = trajectory_info['k_seed']
+    i_seed = trajectory_info['i_seed']
+
+    k_min = trajectory_info['k_min']
+    i_min = trajectory_info['i_min']
+
+    k_mid = trajectory_info['k_mid']
+    i_mid = trajectory_info['i_mid']
+
+    k_max = trajectory_info['k_max']
+    i_max = trajectory_info['i_max']
+
+    sf = starting_frame
+
+    bbox = {'boxstyle': 'round',
+            'facecolor': trajectory_color,
+            'edgecolor': 'none',
+            'alpha': 0.4}
+    font = FontProperties(family='monospace', weight='bold', size=fontsize)
+
+    if 'all' in display:
+        display = ['k_min', 'k_mid', 'k_max', 'k_seed']
+
+    if 'k_seed' in display:
+        if annotate:
+            ax.annotate(k_seed, [candidates[k_seed-sf, i_seed, 1], candidates[k_seed-sf, i_seed, 0]], fontproperties=font, bbox=bbox, color='k')
+        if show_fitting_points:
+            ax.scatter(candidates[k_seed-sf, i_seed, 1], candidates[k_seed-sf, i_seed, 0], c='k', s=5)
+
+    if 'k_min' in display:
+        if annotate:
+            ax.annotate(k_min, [candidates[k_min-sf, i_min, 1], candidates[k_min-sf, i_min, 0]], fontproperties=font, bbox=bbox, color='w')
+        if show_fitting_points:
+            ax.scatter(candidates[k_min-sf, i_min, 1], candidates[k_min-sf, i_min, 0], c='w', marker='^')
+
+    if 'k_mid' in display:
+        if annotate:
+            ax.annotate(k_mid, [candidates[k_mid-sf, i_mid, 1], candidates[k_mid-sf, i_mid, 0]], fontproperties=font, bbox=bbox, color='w')
+        if show_fitting_points:
+            ax.scatter(candidates[k_mid-sf, i_mid, 1], candidates[k_mid-sf, i_mid, 0], c='w')
+
+    if 'k_max' in display:
+        if annotate:
+            ax.annotate(k_max, [candidates[k_max-sf, i_max, 1], candidates[k_max-sf, i_max, 0]], fontproperties=font, bbox=bbox, color='w')
+        if show_fitting_points:
+            ax.scatter(candidates[k_max-sf, i_max, 1], candidates[k_max-sf, i_max, 0], c='w', marker='s')
+
+
 def show_single_trajectory(fitting_info,
                            candidates,
                            k_seed,
@@ -92,7 +189,7 @@ def show_single_trajectory(fitting_info,
                            ax=None,
                            show_outside_range=False,
                            display='k_min stats',
-                           stat_frame = None,
+                           frame_index = None,
                            annotate=True,
                            show_fitting_points=False,
                            trajectory_color='y',
@@ -103,6 +200,7 @@ def show_single_trajectory(fitting_info,
                            verbose=True,
                            dark_mode=True,
                            **kwargs):
+
     if ax is None:
         w, h = 1280, 720
         fig, ax = plt.subplots(figsize=(w/dpi, h/dpi), dpi=dpi)
@@ -117,86 +215,20 @@ def show_single_trajectory(fitting_info,
         ax.set_xlim(0, frame.shape[1])
         ax.set_ylim(frame.shape[0], 0)
 
-    # find whether trajectory is found
-    trajectories_info = fitting_info['trajectories']
-    starting_frame = trajectories_info[0]['k_seed']
-
-    trajectory_info = None
-    exists_trajectory = False
-    i_seed = 0
-    if k_seed is not None:
-        # offset k_seed by starting frame and get trajectory_info
-        k_seed -= starting_frame
-        trajectory_info = trajectories_info[k_seed]
-        # get i_seed
-        i_seed = trajectory_info['i_seed']
-        exists_trajectory = trajectory_info['found_trajectory']
-    else:
+    # get trajectory_info and starting frame
+    starting_frame = fitting_info['trajectories'][0]['k_seed']
+    if k_seed is None:
         k_seed = starting_frame
+    trajectory_info = fitting_info['trajectories'][k_seed-starting_frame]
 
-    # find k_min, k_mid and and k_max
-    if exists_trajectory:
-        if k_min is None:
-            k_min = trajectory_info['k_min']
-            i_min = trajectory_info['i_min']
-        elif i_min is None:
-            raise ValueError('You must pass both k_min and i_min')
-
-        k_min -= starting_frame
-
-        if k_max is None:
-            k_max = trajectory_info['k_max']
-            i_max = trajectory_info['i_max']
-        elif i_max is None:
-            raise ValueError('You must pass both k_max and i_max')
-
-        k_max -= starting_frame
-
-        k_mid = trajectory_info['k_mid'] - starting_frame
-        i_mid = trajectory_info['i_mid']
-
-    # display trajectory statistics
+    # display table of trajectory statistics
     if annotate and display is not None and ('parameters' in display or
                                              'params' in display or
                                              'p' in display or
                                              's' in display or
                                              'stats' in display or
                                              'all' in display):
-        s = 7
-
-        ann = f"{stat_frame}".ljust(s+2) if stat_frame is not None else " "*(s+2)
-        ann += f"x" + " "*(s-1) + "y" + " "*(s-3) + "|.|"
-        ann += "\n" + "\u2014"*(s*3+3) + "\n"
-
-        if exists_trajectory:
-            a = trajectory_info['a']
-            v0 = trajectory_info['v']
-            p0 = candidates[k_min, i_min]
-
-            if stat_frame is not None:
-                t = stat_frame - k_min - starting_frame
-                v = v0 + a*t
-                p = p0 + v0*t + a*t*t/2
-                ann += "p  " + f"{p[1]:.0f}".rjust(s) + f"{p[0]:.0f}".rjust(s)
-                ann += "\n"
-                ann += "v  " + f"{v[1]:.2f}".rjust(s) + f"{v[0]:.2f}".rjust(s) + f"{np.linalg.norm(v):.2f}".rjust(s)
-                ann += "\n"
-            ann += "p0 " + f"{p0[1]:.0f}".rjust(s) + f"{p0[0]:.0f}".rjust(s)
-            ann += "\n"
-            ann += "v0 " + f"{v0[1]:.2f}".rjust(s) + f"{v0[0]:.2f}".rjust(s) + f"{np.linalg.norm(v0):.2f}".rjust(s)
-            ann += "\n"
-            ann += "a  " + f"{a[1]:.2f}".rjust(s) + f"{a[0]:.2f}".rjust(s) + f"{np.linalg.norm(a):.2f}".rjust(s)
-        else:
-            if stat_frame is not None:
-                ann += "p  " + f"---".rjust(s) + f"---".rjust(s)
-                ann += "\n"
-                ann += "v  " + f"---".rjust(s) + f"---".rjust(s) + f"---".rjust(s)
-                ann += "\n"
-            ann += "p0 " + f"---".rjust(s) + f"---".rjust(s)
-            ann += "\n"
-            ann += "v0 " + f"---".rjust(s) + f"---".rjust(s) + f"---".rjust(s)
-            ann += "\n"
-            ann += "a  " + f"---".rjust(s) + f"---".rjust(s) + f"---".rjust(s)
+        ann = get_stats_table(frame_index, trajectory_info)
 
         facecolor = '#232323'if dark_mode else '#FFFFFF'
         textcolor = '#FFFFFF' if dark_mode else '#000000'
@@ -210,55 +242,48 @@ def show_single_trajectory(fitting_info,
         ax.annotate(ann, [40, 40], fontproperties=font, bbox=bbox, color=textcolor, va='top')
 
     # if the trajectory is not found, return the axes as they are
-    if not exists_trajectory:
+    if not trajectory_info['found_trajectory']:
         if verbose:
             print(f'No fitted trajectory for frame {k_seed}')
         return ax
 
+    # find k_min and and k_max
+    if k_min is None:
+        k_min = trajectory_info['k_min']
+        i_min = trajectory_info['i_min']
+    elif i_min is None:
+        raise ValueError('You must pass both k_min and i_min')
+
+    if k_max is None:
+        k_max = trajectory_info['k_max']
+        i_max = trajectory_info['i_max']
+    elif i_max is None:
+        raise ValueError('You must pass both k_max and i_max')
+
     # display trajectory
     trajectory = trajectory_info['trajectory']
+    k = np.arange(len(trajectory)) + k_seed - starting_frame - (len(trajectory)-1)//2
 
-    # trajectory
-    k = np.arange(len(trajectory)) + k_seed - (len(trajectory)-1)//2
+    # offset k_min and k_max them by the starting frame to correctly index candidates
+    k_min -= starting_frame
+    k_max -= starting_frame
     if show_outside_range:
-        ax.plot(trajectory[k<=k_min,1],trajectory[k<=k_min,0], line_style, color=trajectory_color, zorder=-1, alpha=alpha/4, **kwargs)
-        ax.plot(trajectory[k>=k_max,1],trajectory[k>=k_max,0], line_style, color=trajectory_color, zorder=-1, alpha=alpha/4, **kwargs)
+        ax.plot(trajectory[k<=k_min,1], trajectory[k<=k_min,0], line_style, color=trajectory_color, zorder=-1, alpha=alpha/4, **kwargs)
+        ax.plot(trajectory[k>=k_max,1], trajectory[k>=k_max,0], line_style, color=trajectory_color, zorder=-1, alpha=alpha/4, **kwargs)
     mask = np.logical_and(k>=k_min, k<=k_max)
-    ax.plot(trajectory[mask,1],trajectory[mask,0], line_style, color=trajectory_color, zorder=-1, alpha=alpha, **kwargs)
+    ax.plot(trajectory[mask,1], trajectory[mask,0], line_style, color=trajectory_color, zorder=-1, alpha=alpha, **kwargs)
 
+    # Display frame labels
     if display is not None:
-        bbox = {'boxstyle': 'round',
-                'facecolor': trajectory_color,
-                'edgecolor': 'none',
-                'alpha': 0.4}
-        font = FontProperties(family='monospace', weight='bold', size=fontsize)
-
-        if 'all' in display:
-            display = ['k_min', 'k_mid', 'k_max', 'k_seed']
-
-        if 'k_seed' in display:
-            if annotate:
-                ax.annotate(k_seed + starting_frame, [candidates[k_seed, i_seed, 1], candidates[k_seed, i_seed, 0]], fontproperties=font, bbox=bbox, color='k')
-            if show_fitting_points:
-                ax.scatter(candidates[k_seed, i_seed, 1], candidates[k_seed, i_seed, 0], c='k', s=5)
-
-        if 'k_min' in display:
-            if annotate:
-                ax.annotate(k_min + starting_frame, [candidates[k_min, i_min, 1], candidates[k_min, i_min, 0]], fontproperties=font, bbox=bbox, color='w')
-            if show_fitting_points:
-                ax.scatter(candidates[k_min, i_min, 1], candidates[k_min, i_min, 0], c='w', marker='^')
-
-        if 'k_mid' in display:
-            if annotate:
-                ax.annotate(k_mid + starting_frame, [candidates[k_mid, i_mid, 1], candidates[k_mid, i_mid, 0]], fontproperties=font, bbox=bbox, color='w')
-            if show_fitting_points:
-                ax.scatter(candidates[k_mid, i_mid, 1], candidates[k_mid, i_mid, 0], c='w')
-
-        if 'k_max' in display:
-            if annotate:
-                ax.annotate(k_max + starting_frame, [candidates[k_max, i_max, 1], candidates[k_max, i_max, 0]], fontproperties=font, bbox=bbox, color='w')
-            if show_fitting_points:
-                ax.scatter(candidates[k_max, i_max, 1], candidates[k_max, i_max, 0], c='w', marker='s')
+        display_frame_labels(ax,
+                             display,
+                             candidates,
+                             trajectory_info,
+                             starting_frame,
+                             annotate,
+                             show_fitting_points,
+                             trajectory_color,
+                             fontsize)
 
     ax.set_axis_off()
     fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
@@ -352,14 +377,16 @@ def show_neighboring_trajectories(frame_idx,
     # show heatmap and detection candidates
     if heatmap is not None:
         heatmap = cv2.resize(heatmap, (frame.shape[1], frame.shape[0]))
-        frame = cv2.addWeighted(frame, 0.5, cv2.cvtColor(heatmap, cv2.COLOR_GRAY2RGB), 0.5, 0)
+        if len(heatmap.shape)==2:
+            heatmap = cv2.cvtColor(heatmap, cv2.COLOR_GRAY2RGB)
+        frame = cv2.addWeighted(frame, 0.5, heatmap, 0.5, 0)
 
-        # put red dot on the frame
-        starting_frame = fitting_info['trajectories'][0]['k_seed']
+    # put red dot on the frame
+    starting_frame = fitting_info['trajectories'][0]['k_seed']
 
-        positions = candidates[frame_idx - starting_frame][:,::-1]
-        positions = positions[np.where(positions[0]>=0)]
-        frame = annotate_frame(frame, positions)
+    positions = candidates[frame_idx - starting_frame][:,::-1]
+    # positions = positions[np.where(positions[0]>=0)]
+    frame = annotate_detections(frame, positions)
 
     node = path_mapping[frame_idx]
 
@@ -392,7 +419,7 @@ def show_neighboring_trajectories(frame_idx,
                                 node,
                                 display=display,
                                 frame=frame,
-                                stat_frame=frame_idx,
+                                frame_index=frame_idx,
                                 alpha=alpha,
                                 trajectory_color=color,
                                 ax=ax,
@@ -410,6 +437,15 @@ def show_neighboring_trajectories(frame_idx,
     return im2
 
 
+def get_heatmap(trigger_frames: Union[set, list], current_frame: int, w: int, h: int):
+    im = np.zeros((h,w,3), dtype=np.uint8)
+    if trigger_frames is None:
+        return im
+    if current_frame in trigger_frames:
+        im[:,:,1] += 255
+    return im
+
+
 def create_trajectory_video(candidates,
                             src: Union[str, list],
                             dst: str,
@@ -423,10 +459,11 @@ def create_trajectory_video(candidates,
                             fitting_kw={},
                             output_resolution=(1280, 720),
                             fps=30,
+                            trigger_frames=None,
                             **kwargs):
     """Create trajectory video. If num_frames is 0 or 1, an image will be created.
 
-    TODO: correct the part regarding `candidates`"""
+    TODO: correct the part regarding `candidates` and `n_candidates`"""
 
     if fitting_info is None:
         n_candidates = np.ones(len(candidates)) #TODO: correct this part
@@ -483,8 +520,9 @@ def create_trajectory_video(candidates,
 
         #TODO: do something about the heatmaps
         heatmap=None
-        # if show_heatmaps:
-        #     heatmap = get_heatmap(train_configuration, i+starting_frame, split, training_phase=training_phase)
+        if show_heatmaps:
+            # heatmap = get_heatmap(train_configuration, i+starting_frame, split, training_phase=training_phase)
+            heatmap = get_heatmap(trigger_frames, i+starting_frame, w, h)
         im2 = show_neighboring_trajectories(i+starting_frame,
                                             fitting_info,
                                             candidates,

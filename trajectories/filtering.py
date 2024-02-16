@@ -124,6 +124,26 @@ def find_shortest_paths(trajectory_graph: nx.DiGraph):
     return paths
 
 
+def clean_path_mapping(path_mapping):
+    """Removes trajectories that begin and end between other ones"""
+    v_old = list(path_mapping.values())[0]
+    k_old = list(path_mapping.keys())[0]
+    k_place = k_old
+    v_place = v_old
+    for k, v in path_mapping.items():
+        if v is None:
+            continue
+        if v!=v_old:
+            if v==v_place:
+                for k in range(k_place, k):
+                    path_mapping[k] = v_place
+            k_place = k_old
+            v_place = v_old
+        v_old = v
+        k_old = k
+    return path_mapping
+
+
 def build_path_mapping(fitting_info: dict, shortest_paths: list = None):
     """Build mapping from each frame to the corresponding fitted path
 
@@ -157,7 +177,7 @@ def build_path_mapping(fitting_info: dict, shortest_paths: list = None):
             if k_min <= frame_idx and k_max >= frame_idx:
                 mapping[frame_idx] = k_seed
                 break
-    return mapping
+    return clean_path_mapping(mapping)
 
 
 def find_next_node(frame_idx, path_mapping):
