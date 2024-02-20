@@ -116,8 +116,8 @@ def frame_generator_file(filename, start_frame=0, stop_frame=None, verbose=True)
 
 
 def frame_generator(src: Union[str, list],
-                    start_frames: Union[int, list] = None,
-                    stop_frames: Union[int, list] = None,
+                    start_frame: int = 0,
+                    stop_frame: int = None,
                     verbose: bool = True):
     """Generator that yields video frames from the given sources.
 
@@ -126,10 +126,10 @@ def frame_generator(src: Union[str, list],
     src : string | list of str
         names of the video sources (one or multiple). Each source can either be a video file
         or a folder containing the single video frames as image files.
-    start_frames : int | list of int, optional
-        starting frame from which to read each video source, by default 0.
-    stop_frames : int | list of int, optional
-        final frame from which to read each video source, by default the final frame
+    start_frame : int, optional
+        starting frame from which to read the video sources, by default 0.
+    stop_frame : int | list of int, optional
+        final frame from which to read the video sources, by default the final frame
     verbose : bool, optional
         by default True
 
@@ -149,27 +149,19 @@ def frame_generator(src: Union[str, list],
     if type(src) is str:
         src = [src]
 
-    if start_frames is None:
-        start_frames = [0 for _ in range(len(src))]
-
-    if stop_frames is None:
-        stop_frames = [None for _ in range(len(src))]
-
-    if type(start_frames) is int:
-        start_frames = [start_frames]
-
-    if type(stop_frames) is int:
-        stop_frames = [stop_frames]
-
-    if len(start_frames) != len(src) or len(stop_frames) != len(src):
-        raise ValueError('src, start_frames and stop_frames must have the same length.')
-
     for source in src:
         if not os.path.exists(source):
             raise ValueError(f'Source {src} not found')
 
+    frame_counter = 0
     for i in range(len(src)):
-        generator = frame_generator_dir if os.path.isdir(src[i]) else frame_generator_file
+        if stop_frame is not None and frame_counter >= stop_frame-start_frame:
+            break
         if verbose: print(f'source {i+1} of {len(src)}:')
-        for frame in generator(src[i], start_frames[i], stop_frames[i], verbose):
+        generator = frame_generator_dir if os.path.isdir(src[i]) else frame_generator_file
+
+        stop = stop_frame - frame_counter if stop_frame is not None else None
+        for frame in generator(src[i], start_frame, stop, verbose):
             yield frame
+            frame_counter += 1
+        start_frame = 0
