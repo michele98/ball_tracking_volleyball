@@ -474,7 +474,7 @@ def create_trajectory_video(candidates: np.ndarray,
                             dst: str,
                             fitting_info: dict = None,
                             path_mapping: dict = None,
-                            show_heatmaps: bool = True,
+                            heatmaps_folder: str = None,
                             trigger_frames: list = None,
                             num_frames: int = None,
                             starting_frame: int = 0,
@@ -503,7 +503,7 @@ def create_trajectory_video(candidates: np.ndarray,
         If not provided, it will be computed from `candidates` and `n_candidates`.
     path_mapping : dict, optional
         _description_, by default None
-    show_heatmaps : bool, optional
+    heatmaps_folder : bool, optional
         _description_, by default True
     trigger_frames : list, optional
         _description_, by default None
@@ -584,7 +584,7 @@ def create_trajectory_video(candidates: np.ndarray,
 
         #TODO: do something about the heatmaps
         heatmap=None
-        if show_heatmaps:
+        if trigger_frames is not None:
             heatmap = get_heatmap(trigger_frames, i+starting_frame, w, h)
         im2 = show_neighboring_trajectories(i+starting_frame,
                                             fitting_info,
@@ -596,8 +596,9 @@ def create_trajectory_video(candidates: np.ndarray,
                                             line_style=line_style,
                                             linewidth=1.5,
                                             **kwargs)
-        heatmap = get_heatmap_from_folder('poses', i+starting_frame, w, h, zfill=4)
-        im2 = cv2.add(im2, heatmap)
+        if heatmaps_folder is not None:
+            heatmap = get_heatmap_from_folder(heatmaps_folder, i+starting_frame, w, h, zfill=4)
+            im2 = cv2.add(im2, heatmap)
 
         if output_video:
             out.write(cv2.cvtColor(im2, cv2.COLOR_RGB2BGR))
