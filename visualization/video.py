@@ -469,33 +469,6 @@ def get_heatmap_from_folder(folder: str,
     return cv2.resize(im, (w, h))
 
 
-def get_heatmap_from_folder_2(folder: str,
-                            current_frame: int,
-                            trigger_frames,
-                            w: int, h: int,
-                            fade=5,
-                            zfill: int = 4,
-                            color: tuple = (0, 255, 0),
-                            fade_before: bool = True):
-    im = cv2.imread(os.path.join(folder, f'{str(current_frame).zfill(zfill)}.png'))
-    im = cv2.resize(im, (w, h))
-
-    im_trig = np.zeros((h,w,3), dtype=np.uint8)
-    for i in range(fade):
-        if current_frame-i in trigger_frames:
-            for c in range(3):
-                im_trig[:,:,c] += int(color[c]/fade*(fade-i))
-            return cv2.add(im, im_trig)
-    if fade_before:
-        fade = fade//2
-        for i in range(fade):
-            if current_frame+i in trigger_frames:
-                for c in range(3):
-                    im_trig[:,:,c] += int(color[c]/fade*(fade-i))
-                return cv2.add(im, im_trig)
-    return cv2.add(im, im_trig)
-
-
 def create_trajectory_video(candidates: np.ndarray,
                             src: Union[str, list],
                             dst: str,
@@ -603,9 +576,7 @@ def create_trajectory_video(candidates: np.ndarray,
 
     # TODO: implement ending frame
     # for i, frame in enumerate(frame_generator(src, starting_frame, starting_frame+num_frames)):
-    if type(starting_frame) is int:
-        starting_frames = [starting_frame]*len(src)
-    for i, frame in enumerate(frame_generator(src, starting_frames)):
+    for i, frame in enumerate(frame_generator(src, starting_frame, starting_frame+num_frames)):
         frame = cv2.resize(frame.copy(), (w, h))
         ax.cla()
         if i%100 == 0:
@@ -614,9 +585,7 @@ def create_trajectory_video(candidates: np.ndarray,
         #TODO: do something about the heatmaps
         heatmap=None
         if show_heatmaps:
-            # heatmap = get_heatmap(trigger_frames, i+starting_frame, w, h)
-            # heatmap = get_heatmap_from_folder('poses', i+starting_frame, w, h, zfill=4)
-            heatmap = get_heatmap_from_folder_2('poses', i+starting_frame, trigger_frames, w, h, zfill=4)
+            heatmap = get_heatmap(trigger_frames, i+starting_frame, w, h)
         im2 = show_neighboring_trajectories(i+starting_frame,
                                             fitting_info,
                                             candidates,
@@ -627,6 +596,8 @@ def create_trajectory_video(candidates: np.ndarray,
                                             line_style=line_style,
                                             linewidth=1.5,
                                             **kwargs)
+        heatmap = get_heatmap_from_folder('poses', i+starting_frame, w, h, zfill=4)
+        im2 = cv2.add(im2, heatmap)
 
         if output_video:
             out.write(cv2.cvtColor(im2, cv2.COLOR_RGB2BGR))
