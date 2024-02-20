@@ -461,28 +461,106 @@ def get_heatmap(trigger_frames: Union[set, list],
     return im
 
 
-def create_trajectory_video(candidates,
+def get_heatmap_from_folder(folder: str,
+                            current_frame: int,
+                            w: int, h: int,
+                            zfill: int = 4):
+    im = cv2.imread(os.path.join(folder, f'{str(current_frame).zfill(zfill)}.png'))
+    return cv2.resize(im, (w, h))
+
+
+def get_heatmap_from_folder_2(folder: str,
+                            current_frame: int,
+                            trigger_frames,
+                            w: int, h: int,
+                            fade=5,
+                            zfill: int = 4,
+                            color: tuple = (0, 255, 0),
+                            fade_before: bool = True):
+    im = cv2.imread(os.path.join(folder, f'{str(current_frame).zfill(zfill)}.png'))
+    im = cv2.resize(im, (w, h))
+
+    im_trig = np.zeros((h,w,3), dtype=np.uint8)
+    for i in range(fade):
+        if current_frame-i in trigger_frames:
+            for c in range(3):
+                im_trig[:,:,c] += int(color[c]/fade*(fade-i))
+            return cv2.add(im, im_trig)
+    if fade_before:
+        fade = fade//2
+        for i in range(fade):
+            if current_frame+i in trigger_frames:
+                for c in range(3):
+                    im_trig[:,:,c] += int(color[c]/fade*(fade-i))
+                return cv2.add(im, im_trig)
+    return cv2.add(im, im_trig)
+
+
+def create_trajectory_video(candidates: np.ndarray,
                             src: Union[str, list],
                             dst: str,
-                            fitting_info=None,
-                            path_mapping=None,
-                            show_heatmaps=True,
-                            dpi=100,
-                            num_frames=None,
-                            starting_frame=0,
+                            fitting_info: dict = None,
+                            path_mapping: dict = None,
+                            show_heatmaps: bool = True,
+                            trigger_frames: list = None,
+                            num_frames: int = None,
+                            starting_frame: int = 0,
                             line_style='-',
-                            fitting_kw={},
-                            output_resolution=(1280, 720),
-                            fps=30,
-                            trigger_frames=None,
+                            fitting_kw: dict = {},
+                            dpi: int = 100,
+                            output_resolution: tuple[int] = (1280, 720),
+                            fps: int = 30,
                             **kwargs):
     """Create trajectory video. If num_frames is 0 or 1, an image will be created.
 
-    TODO: correct the part regarding `candidates` and `n_candidates`"""
+    Parameters
+    ----------
+    candidates : np.ndarray,
+        positions of the detection candidates, of
+        shape (num_candidates, max_candidates_per_frame, 2).
+        The y and x components are the first and second elements
+        of the last dimension, respectively.
+    src : Union[str, list]
+        source of the video. Can be a collection of images or a video file.
+        If a list is passed, multiple sources will be concatenated.
+    dst : str
+        destination of the video. If `num_frames` is 0 or 1, an image will be created.
+    fitting_info : dict, optional
+        fitting information provided by `trajectories.fitting.fit_trajectories`.
+        If not provided, it will be computed from `candidates` and `n_candidates`.
+    path_mapping : dict, optional
+        _description_, by default None
+    show_heatmaps : bool, optional
+        _description_, by default True
+    trigger_frames : list, optional
+        _description_, by default None
+    num_frames : int, optional
+        _description_, by default None
+    starting_frame : int, optional
+        _description_, by default 0
+    line_style : str, optional
+        _description_, by default '-'
+    fitting_kw : dict, optional
+        _description_, by default {}
+    dpi : int, optional
+        _description_, by default 100
+    output_resolution : tuple[int], optional
+        _description_, by default (1280, 720)
+    fps : int, optional
+        _description_, by default 30
 
+    Returns
+    -------
+    _type_
+        _description_
+
+    Raises
+    ------
+    FileNotFoundError
+        _description_
+    """
     if fitting_info is None:
-        n_candidates = np.ones(len(candidates)) #TODO: correct this part
-        fitting_info = fit_trajectories(candidates, n_candidates, starting_frame, **fitting_kw)
+        fitting_info = fit_trajectories(candidates, starting_frame, **fitting_kw)
         trajectory_graph = build_trajectory_graph(fitting_info)
         shortest_paths = find_shortest_paths(trajectory_graph)
     if path_mapping is None:
@@ -536,8 +614,9 @@ def create_trajectory_video(candidates,
         #TODO: do something about the heatmaps
         heatmap=None
         if show_heatmaps:
-            # heatmap = get_heatmap(train_configuration, i+starting_frame, split, training_phase=training_phase)
-            heatmap = get_heatmap(trigger_frames, i+starting_frame, w, h)
+            # heatmap = get_heatmap(trigger_frames, i+starting_frame, w, h)
+            # heatmap = get_heatmap_from_folder('poses', i+starting_frame, w, h, zfill=4)
+            heatmap = get_heatmap_from_folder_2('poses', i+starting_frame, trigger_frames, w, h, zfill=4)
         im2 = show_neighboring_trajectories(i+starting_frame,
                                             fitting_info,
                                             candidates,

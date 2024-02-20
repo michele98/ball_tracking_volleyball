@@ -432,7 +432,7 @@ def fit_trajectory(candidates: np.ndarray, n_candidates: np.ndarray, k_seed: int
     return info_dict
 
 
-def fit_trajectories(candidates: np.ndarray, n_candidates: np.ndarray, starting_frame: int=0, seed_radius: float=40, d_threshold: float=10, N: int=10):
+def fit_trajectories(candidates: np.ndarray, starting_frame: int=0, seed_radius: float=40, d_threshold: float=10, N: int=10):
     """Fit trajectories on the given position candidates.
 
     Parameters
@@ -442,8 +442,7 @@ def fit_trajectories(candidates: np.ndarray, n_candidates: np.ndarray, starting_
         The first dimension refers to the frames,
         the second dimension to the candidate in each frame
         and the third one to the x and y components: the first element is y, the second one x.
-    n_candidates : 1D np.ndarray
-        number of candidates in each frame. Necessary for jit complation
+        Slots with no detection are (-1, -1).
     starting_frame : int, optional
         index of the first frame in the video onto which the trajectory fitting is done, by default 0
     seed_radius : float, optional
@@ -487,6 +486,11 @@ def fit_trajectories(candidates: np.ndarray, n_candidates: np.ndarray, starting_
     fitting_info = {'parameters': {'seed_radius': seed_radius, 'd_threshold': d_threshold, 'N': N}}
     fitting_info['trajectories'] = []
 
+    # find n_candidates for each frame
+    mask = (candidates[:,:,0] == -1) & (candidates[:,:,1] == -1)
+    n_candidates = np.argmax(mask, axis=1)
+    n_candidates = np.where(n_candidates == 0, candidates.shape[1], n_candidates)
+
     print("Fitting trajectories:")
     print(fitting_info['parameters'])
     for k in range(len(candidates)):
@@ -517,7 +521,7 @@ def trajectories_to_json(info: dict, filename: str, indent=None):
         for k, v in ti.items():
             if type(v) is np.ndarray:
                 value = v.tolist()
-            elif type(v) is np.int32:
+            elif type(v) in {np.int32, np.int64}:
                 value = int(v)
             elif type(v) is np.float32:
                 value = float(v)
@@ -636,7 +640,6 @@ def fit_trajectories_on_seed_2(candidates: np.ndarray, n_candidates: np.ndarray,
             support = support_next
             cost = cost_next
             k_min, k_mid, k_max, i_min, i_mid, i_max = k_min_next, k_mid_next, k_max_next, i_min_next, i_mid_next, i_max_next
-
 
     costs = np.where(np.isnan(costs), np.inf, costs) # turn nan costs to infinity
     return parameters, info, trajectories, supports, costs
