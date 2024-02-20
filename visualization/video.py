@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from typing import Union
 from matplotlib.font_manager import FontProperties
 
-from utils.video_utils import frame_generator, figure_to_array
+from utils.video_utils import frame_generator, figure_to_array, get_heatmap, get_heatmap_from_folder
 
 # from trajectories.data_reading import get_candidates, get_heatmap, get_video_source
 from trajectories.fitting import fit_trajectories
@@ -286,7 +286,8 @@ def show_single_trajectory(fitting_info,
                              fontsize)
 
     ax.set_axis_off()
-    fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+    if frame is not None:
+        fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
 
     return ax
 
@@ -437,38 +438,6 @@ def show_neighboring_trajectories(frame_idx,
     return im2
 
 
-def get_heatmap(trigger_frames: Union[set, list],
-                current_frame: int,
-                w: int, h: int,
-                fade: int = 5,
-                fade_before: bool = True,
-                color: tuple = (0, 255, 0)):
-    im = np.zeros((h,w,3), dtype=np.uint8)
-    if trigger_frames is None:
-        return im
-    for i in range(fade):
-        if current_frame-i in trigger_frames:
-            for c in range(3):
-                im[:,:,c] += int(color[c]/fade*(fade-i))
-            return im
-    if fade_before:
-        fade = fade//2
-        for i in range(fade):
-            if current_frame+i in trigger_frames:
-                for c in range(3):
-                    im[:,:,c] += int(color[c]/fade*(fade-i))
-                return im
-    return im
-
-
-def get_heatmap_from_folder(folder: str,
-                            current_frame: int,
-                            w: int, h: int,
-                            zfill: int = 4):
-    im = cv2.imread(os.path.join(folder, f'{str(current_frame).zfill(zfill)}.png'))
-    return cv2.resize(im, (w, h))
-
-
 def create_trajectory_video(candidates: np.ndarray,
                             src: Union[str, list],
                             dst: str,
@@ -574,15 +543,14 @@ def create_trajectory_video(candidates: np.ndarray,
 
     fig, ax = plt.subplots(figsize=(w/dpi, h/dpi), dpi=dpi)
 
-    # TODO: implement ending frame
-    # for i, frame in enumerate(frame_generator(src, starting_frame, starting_frame+num_frames)):
+    # clear_frame = np.zeros(first_frame.shape, dtype=np.uint8)
     for i, frame in enumerate(frame_generator(src, starting_frame, starting_frame+num_frames)):
         frame = cv2.resize(frame.copy(), (w, h))
+        # frame = clear_frame
         ax.cla()
         if i%100 == 0:
             gc.collect()
 
-        #TODO: do something about the heatmaps
         heatmap=None
         if trigger_frames is not None:
             heatmap = get_heatmap(trigger_frames, i+starting_frame, w, h)

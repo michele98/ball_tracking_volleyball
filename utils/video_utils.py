@@ -6,6 +6,38 @@ import numpy as np
 from typing import Union
 
 
+def get_heatmap(trigger_frames: Union[set, list],
+                current_frame: int,
+                w: int, h: int,
+                fade: int = 5,
+                fade_before: bool = True,
+                color: tuple = (0, 255, 0)):
+    im = np.zeros((h,w,3), dtype=np.uint8)
+    if trigger_frames is None:
+        return im
+    for i in range(fade):
+        if current_frame-i in trigger_frames:
+            for c in range(3):
+                im[:,:,c] += int(color[c]/fade*(fade-i))
+            return im
+    if fade_before:
+        fade = fade//2
+        for i in range(fade):
+            if current_frame+i in trigger_frames:
+                for c in range(3):
+                    im[:,:,c] += int(color[c]/fade*(fade-i))
+                return im
+    return im
+
+
+def get_heatmap_from_folder(folder: str,
+                            current_frame: int,
+                            w: int, h: int,
+                            zfill: int = 4):
+    im = cv2.imread(os.path.join(folder, f'{str(current_frame).zfill(zfill)}.png'))
+    return cv2.resize(im, (w, h))
+
+
 def figure_to_array(fig):
     """Convert matplotlib figure to numpy array"""
     with io.BytesIO() as buff:
